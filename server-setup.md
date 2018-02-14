@@ -1,11 +1,14 @@
 # Setup Guide
-This guide details the changes I've made to a base Ubuntu 16.04 machine.
+This guide details the changes we need to make to a base Ubuntu 16.04 machine.
 We will install cuda toolkit 9.0 and cudnn 7.
 Cuda toolkit 9.0 is broken with the latest kernel, so we have to go back to 4.10.
 
+Finally, we will install python 3.6.3 via pyenv to keep our stuff isolated from the system python.
+
 ## Kernel Version
-Some talk on forums suggested that cuda doesn't play nice with 4.13 linux kernel, so I manually booted back into 4.10 by updating
-`GRUB_DEFAULT` in `/etc/default/grub` and running `sudo update-grub` followed by a reboot.
+Some talk on forums suggested that cuda doesn't play nice with 4.13 linux
+kernel, so we'll manually booted back into 4.10 by updating `GRUB_DEFAULT` in
+`/etc/default/grub` and running `sudo update-grub` followed by a reboot.
 
 ```
 GRUB_DEFAULT="Advanced options for Ubuntu>Ubuntu, with Linux 4.10.0-42-generic"
@@ -57,7 +60,7 @@ $ ls -lah *.deb
 -rw-r--r-- 1 ubuntu ubuntu 4.3M Jan 15 10:46 libcudnn7-doc_7.0.5.15-1+cuda9.1_amd64.deb
 ```
 
-## Installation
+## Cuda  Installation
 Install repository meta-data
 
 ```
@@ -299,4 +302,30 @@ Resulting weights from Softmax:
 Result of classification: 1 3 5
 
 Test passed!
+```
+
+## Install python 3.6.3 via pyenv
+
+First we need to install some packages so we can compile a new python interpreter.
+```
+sudo apt-get install -y build-essential libncursesw5-dev libreadline6-dev \
+    libssl-dev libgdbm-dev libc6-dev libsqlite3-dev libbz2-dev \
+    libjpeg9 libjpeg9-dev libfreetype6 libfreetype6-dev zlib1g-dev
+```
+
+Now we download pyenv and update our login scripts so they setup the shims correctly.
+```
+git clone https://github.com/pyenv/pyenv.git ~/.pyenv
+echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc
+echo -e 'if command -v pyenv 1>/dev/null 2>&1; then\n  eval "$(pyenv init -)"\nfi' >> ~/.bashrc
+```
+
+Launch a new login shell, and then we can use pyenv to compile a new python version for us.
+```
+pyenv install 3.6.3
+```
+
+Finally we set this version of python to be the default interpreter whenever we're in this directory.
+```
+pyenv local 3.6.3
 ```
