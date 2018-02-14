@@ -1,2 +1,2 @@
 # autoencoders-are-cool
-An exploration of Autoencoders and other Deep Learning Topics
+An Exploration of Autoencoders and other Deep Learning Topics
