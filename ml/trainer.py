@@ -187,7 +187,7 @@ class Trainer:
         fig.suptitle(title, fontsize=20)
 
         for test_data, labels in self.test_data_loader:
-            x_in = Variable(test_data).cuda().view(-1, 28 * 28)
+            x_in = Variable(test_data).cuda()
             x_latent = self.model.encode(x_in)
             x_latent_numpy = x_latent.cpu().data.numpy()
             plt.scatter(x=x_latent_numpy.T[0], y=x_latent_numpy.T[1],
