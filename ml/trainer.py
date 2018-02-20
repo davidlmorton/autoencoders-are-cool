@@ -1,7 +1,7 @@
 from matplotlib import pyplot as plt
 from ml.data_generator import DataGenerator
+from ml.utils import Progbar
 from torch.autograd import Variable
-from tqdm import trange
 
 import math
 import pandas as pd
@@ -75,8 +75,11 @@ class Trainer:
         test_losses = []
 
         num_iterations = math.ceil(num_epochs * len(self.training_data_loader))
-        progress_bar = trange(num_iterations, disable=disable_progress_bar)
-        for i in progress_bar:
+
+        verbose = 0 if disable_progress_bar else 1
+        progress_bar = Progbar(num_iterations,
+                stateful_metrics=['loss', 'val_loss'], verbose=verbose)
+        for i in range(num_iterations):
             new_learning_rate = self._update_learning_rate(
                 min_learning_rate=min_learning_rate,
                 max_learning_rate=max_learning_rate,
@@ -101,8 +104,9 @@ class Trainer:
             training_losses.append(avg_training_loss)
             test_losses.append(avg_test_loss)
 
-            progress_bar.set_postfix(loss=f'{avg_training_loss: 0.4f}',
-                          test_loss=f'{avg_test_loss: 0.4f}')
+            progress_bar.add(1,
+                [('loss', avg_training_loss),
+                 ('val_loss', avg_test_loss)])
 
         result = {'learning_rates': learning_rates,
                 'training_losses': training_losses,
