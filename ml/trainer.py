@@ -5,6 +5,7 @@ from tqdm import trange
 
 import math
 import pandas as pd
+import numpy as np
 
 
 class Trainer:
@@ -144,6 +145,13 @@ class Trainer:
         test_loss = self.loss_fn(x_out, x_in)
 
         return test_loss.data[0] / len(x_in)
+
+    @property
+    def num_trainable_parameters(self):
+        model_parameters = filter(lambda p: p.requires_grad,
+                self.model.parameters())
+        params = sum([np.prod(p.size()) for p in model_parameters])
+        return params
 
     def test(self):
         loss = 0.0
