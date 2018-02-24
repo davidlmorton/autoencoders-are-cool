@@ -1,3 +1,5 @@
+# Shamelessly stolen from keras
+
 import collections
 import sys
 import time
