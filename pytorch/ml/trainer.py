@@ -130,25 +130,33 @@ class Trainer:
         return new_learning_rate
 
     def _do_training_step(self):
-        data, _ = self.training_data_generator.next()
-        x_in = Variable(data).cuda()
-
         self.optimizer.zero_grad()
-        x_out = self.model(x_in)
 
-        training_loss = self.loss_fn(x_out, x_in)
-        training_loss.backward()
+        data, labels = self.training_data_generator.next()
+        loss = self._do_step(data, labels)
+
+        loss.backward()
         self.optimizer.step()
 
-        return training_loss.data[0] / len(x_in)
+        return loss.data[0] / len(data)
+
+    def _do_step(self, data, labels):
+        run_dict = self._run_model(data, labels)
+        loss = self.loss_fn(**run_dict)
+        return loss
+
+    def _run_model(self, data, labels):
+        x_in = Variable(data).cuda()
+        y_in = Variable(labels).cuda()
+        in_dict = {'x_in': x_in, 'y_in': y_in}
+
+        out_dict = self.model(**in_dict)
+        return {**out_dict, **in_dict}
 
     def _do_test_step(self):
-        data, _ = self.test_data_generator.next()
-        x_in = Variable(data).cuda()
-        x_out = self.model(x_in)
-        test_loss = self.loss_fn(x_out, x_in)
-
-        return test_loss.data[0] / len(x_in)
+        data, labels = self.test_data_generator.next()
+        test_loss = self._do_step(data, labels)
+        return test_loss.data[0] / len(data)
 
     @property
     def num_trainable_parameters(self):
@@ -159,25 +167,22 @@ class Trainer:
 
     def test(self):
         loss = 0.0
-        for data, _ in self.test_data_loader:
-            x_in = Variable(data).cuda()
-            x_out = self.model(x_in)
-            loss += self.loss_fn(x_out, x_in).data[0]
-
+        for data, labels in self.test_data_loader:
+            loss += self._do_step(data, labels).data[0]
         return loss / len(self.test_data_loader.dataset)
 
     def plot_input_output_pairs(self, title='A Sampling of Autoencoder Results',
         num_cols=10, figsize=(15, 3.2)):
-        test_data, _ = self.test_data_generator.next()
-        x_in = Variable(test_data).cuda()
-        x_out = self.model(x_in)
+        data, labels = self.test_data_generator.next()
+        out_dict = self._run_model(data, labels)
+        x_out = out_dict['x_out']
 
         fig = plt.figure(figsize=figsize)
         fig.suptitle(title, fontsize=20)
 
         for i in range(num_cols):
-            input_image = test_data[i][0]
-            output_image = x_out.view_as(test_data).data.cpu()[i][0]
+            input_image = data[i][0]
+            output_image = x_out.view_as(data).data.cpu()[i][0]
 
             ax = fig.add_subplot(2, num_cols, i+1)
             ax.imshow(input_image, cmap='gray')
@@ -198,9 +203,13 @@ class Trainer:
         fig = plt.figure(figsize=figsize)
         fig.suptitle(title, fontsize=20)
 
-        for test_data, labels in self.test_data_loader:
-            x_in = Variable(test_data).cuda()
-            x_latent = self.model.encode(x_in)
+        for data, labels in self.test_data_loader:
+            x_in = Variable(data).cuda()
+            y_in = Variable(labels).cuda()
+            in_dict = {'x_in': x_in, 'y_in': y_in}
+
+            x_latent = self.model.encode(**in_dict)
+
             x_latent_numpy = x_latent.cpu().data.numpy()
             plt.scatter(x=x_latent_numpy.T[0], y=x_latent_numpy.T[1],
                         c=labels.numpy(), alpha=0.4)

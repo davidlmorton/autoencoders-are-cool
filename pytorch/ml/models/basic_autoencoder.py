@@ -23,7 +23,7 @@ class BasicAutoencoder(nn.Module):
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
 
-    def encode(self, x_in):
+    def encode(self, x_in, **kwargs):
         encoder_input = x_in.view(-1, self.image_width * self.image_height)
         hidden_layer = self.relu(self.fc1(self.bn1(encoder_input)))
         x_latent = self.relu(self.fc2(self.bn2(hidden_layer)))
@@ -34,12 +34,12 @@ class BasicAutoencoder(nn.Module):
         x_out = self.sigmoid(self.fc4(self.bn4(hidden_layer)))
         return x_out
 
-    def forward(self, x_in):
+    def forward(self, x_in, **kwargs):
         x_latent = self.encode(x_in)
         x_out = self.decode(x_latent)
-        return x_out
+        return {'x_out': x_out}
 
 
-def basic_autoencoder_loss_fn(x_out, x_in):
+def basic_autoencoder_loss_fn(x_out, x_in, **kwargs):
     return F.binary_cross_entropy(x_out, x_in.view_as(x_out),
             size_average=False)

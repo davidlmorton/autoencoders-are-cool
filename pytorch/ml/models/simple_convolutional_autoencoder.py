@@ -64,7 +64,7 @@ class SimpleConvolutionalAutoencoder(nn.Module):
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
 
-    def encode(self, x_in):
+    def encode(self, x_in, **kwargs):
         x = self.bn1(x_in)
         x = self.conv1(x)
         x = self.relu(x)
@@ -92,12 +92,12 @@ class SimpleConvolutionalAutoencoder(nn.Module):
         x_out = self.sigmoid(x)
         return x_out
 
-    def forward(self, x_in):
+    def forward(self, x_in, **kwargs):
         x_latent = self.encode(x_in)
         x_out = self.decode(x_latent)
-        return x_out
+        return {'x_out': x_out}
 
 
-def basic_autoencoder_loss_fn(x_out, x_in):
+def basic_autoencoder_loss_fn(x_out, x_in, **kwarg):
     return F.binary_cross_entropy(x_out, x_in.view_as(x_out),
             size_average=False)
