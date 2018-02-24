@@ -24,12 +24,8 @@ class ConvolutionalLayer(nn.Module):
 
 
 class SimpleConvolutionalAutoencoder(nn.Module):
-    def __init__(self, image_width, image_height, image_channels,
-            conv_channels, conv_bias=False):
+    def __init__(self, image_channels, conv_channels, conv_bias=False):
         super().__init__()
-        self.image_width = image_width
-        self.image_height = image_height
-
         self.conv1 = ConvolutionalLayer(
                 in_channels=image_channels,
                 out_channels=conv_channels[0],
