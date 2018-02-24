@@ -3,6 +3,26 @@ from torch import nn
 from torch.nn import functional as F
 
 
+class ConvolutionalLayer(nn.Module):
+    def __init__(self, *, in_channels, out_channels,
+            stride=2, kernel_size=3, padding=1, bias=False):
+        super().__init__()
+        self.bn = nn.BatchNorm2d(num_features=in_channels)
+        self.conv = nn.Conv2d(in_channels=in_channels,
+                out_channels=out_channels,
+                stride=stride,
+                kernel_size=kernel_size,
+                padding=padding,
+                bias=bias)
+        self.relu = nn.ReLU()
+
+    def forward(self, x_in):
+        x = self.bn(x_in)
+        x = self.conv(x)
+        x = self.relu(x)
+        return x
+
+
 class SimpleConvolutionalAutoencoder(nn.Module):
     def __init__(self, image_width, image_height, image_channels,
             conv_channels, conv_bias=False):
@@ -10,27 +30,19 @@ class SimpleConvolutionalAutoencoder(nn.Module):
         self.image_width = image_width
         self.image_height = image_height
 
-        self.bn1 = nn.BatchNorm2d(num_features=image_channels)
-        self.conv1 = nn.Conv2d(in_channels=image_channels,
+        self.conv1 = ConvolutionalLayer(
+                in_channels=image_channels,
                 out_channels=conv_channels[0],
-                stride=2,
-                kernel_size=3,
-                padding=1,
                 bias=conv_bias)
 
-        self.bn2 = nn.BatchNorm2d(num_features=conv_channels[0])
-        self.conv2 = nn.Conv2d(in_channels=conv_channels[0],
+        self.conv2 = ConvolutionalLayer(
+                in_channels=conv_channels[0],
                 out_channels=conv_channels[1],
-                stride=2,
-                kernel_size=3,
-                padding=1,
                 bias=conv_bias)
 
-        self.bn3 = nn.BatchNorm2d(num_features=conv_channels[1])
-        self.conv3 = nn.Conv2d(in_channels=conv_channels[1],
+        self.conv3 = ConvolutionalLayer(
+                in_channels=conv_channels[1],
                 out_channels=conv_channels[2],
-                stride=2,
-                kernel_size=3,
                 padding=2,
                 bias=conv_bias)
 
@@ -65,17 +77,9 @@ class SimpleConvolutionalAutoencoder(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
     def encode(self, x_in, **kwargs):
-        x = self.bn1(x_in)
-        x = self.conv1(x)
-        x = self.relu(x)
-
-        x = self.bn2(x)
+        x = self.conv1(x_in)
         x = self.conv2(x)
-        x = self.relu(x)
-
-        x = self.bn3(x)
-        x = self.conv3(x)
-        x_latent = self.relu(x)
+        x_latent = self.conv3(x)
         return x_latent
 
     def decode(self, x_latent):
