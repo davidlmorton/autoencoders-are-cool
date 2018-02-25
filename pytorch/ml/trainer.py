@@ -10,7 +10,7 @@ import numpy as np
 
 class Trainer:
     def __init__(self, *, model, training_data_loader, test_data_loader,
-                 optimizer, loss_fn, loss_alpha=0.1):
+                 optimizer, loss_alpha=0.1):
         self.model = model
 
         self.training_data_loader = training_data_loader
@@ -23,7 +23,6 @@ class Trainer:
                                     len(test_data_loader))
 
         self.optimizer = optimizer
-        self.loss_fn = loss_fn
         self.loss_alpha = loss_alpha
 
         self.reset_history()
@@ -133,7 +132,8 @@ class Trainer:
         self.optimizer.zero_grad()
 
         data, labels = self.training_data_generator.next()
-        loss = self._do_step(data, labels)
+        step_dict = self._do_step(data, labels)
+        loss = step_dict['total_loss']
 
         loss.backward()
         self.optimizer.step()
@@ -142,8 +142,8 @@ class Trainer:
 
     def _do_step(self, data, labels):
         run_dict = self._run_model(data, labels)
-        loss = self.loss_fn(**run_dict)
-        return loss
+        losses = self.model.calculate_losses(**run_dict)
+        return {**losses, **run_dict}
 
     def _run_model(self, data, labels):
         x_in = Variable(data).cuda()
@@ -155,8 +155,8 @@ class Trainer:
 
     def _do_test_step(self):
         data, labels = self.test_data_generator.next()
-        test_loss = self._do_step(data, labels)
-        return test_loss.data[0] / len(data)
+        step_dict = self._do_step(data, labels)
+        return step_dict['total_loss'].data[0] / len(data)
 
     @property
     def num_trainable_parameters(self):
@@ -168,7 +168,8 @@ class Trainer:
     def test(self):
         loss = 0.0
         for data, labels in self.test_data_loader:
-            loss += self._do_step(data, labels).data[0]
+            step_dict = self._do_step(data, labels)
+            loss += step_dict['total_loss'].data[0]
         return loss / len(self.test_data_loader.dataset)
 
     def plot_input_output_pairs(self, title='A Sampling of Autoencoder Results',

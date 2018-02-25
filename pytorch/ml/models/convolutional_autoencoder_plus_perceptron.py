@@ -1,4 +1,3 @@
-
 from torch import nn
 from torch.nn import functional as F
 
@@ -45,8 +44,41 @@ class DeconvolutionalLayer(nn.Module):
         return x
 
 
-class SimpleConvolutionalAutoencoder(nn.Module):
-    def __init__(self, image_channels, conv_channels, conv_bias=False):
+class Perceptron(nn.Module):
+    def __init__(self, *, in_features, hidden_features, output_features):
+        super().__init__()
+
+        self.bn1 = nn.BatchNorm1d(num_features=in_features)
+        self.linear1 = nn.Linear(in_features=in_features,
+                out_features=hidden_features)
+
+        self.bn2 = nn.BatchNorm1d(num_features=hidden_features)
+        self.linear2 = nn.Linear(in_features=hidden_features,
+                out_features=hidden_features)
+
+        self.bn3 = nn.BatchNorm1d(num_features=hidden_features)
+        self.linear3 = nn.Linear(in_features=hidden_features,
+                out_features=output_features)
+
+        self.relu = nn.ReLU()
+
+    def forward(self, x_in):
+        x = self.bn1(x_in)
+        x = self.linear1(x)
+        x = self.relu(x)
+
+        x = self.bn2(x)
+        x = self.linear2(x)
+        x = self.relu(x)
+
+        x = self.bn3(x)
+        x = self.linear3(x)
+        return x
+
+
+class ConvolutionalAutoencoderPlusPerceptron(nn.Module):
+    def __init__(self, image_channels, conv_channels, hidden_features,
+            perceptron_features, conv_bias=False):
         super().__init__()
         self.conv1 = ConvolutionalLayer(
                 in_channels=image_channels,
@@ -82,6 +114,14 @@ class SimpleConvolutionalAutoencoder(nn.Module):
                 out_channels=image_channels,
                 bias=conv_bias)
 
+        self.perceptron_input_size = 5*5*conv_channels[2]
+        self.perceptron = Perceptron(
+                in_features=self.perceptron_input_size,
+                hidden_features=hidden_features,
+                output_features=perceptron_features)
+
+        self.autoencoder_ratio = 1.0
+
     def encode(self, x_in, **kwargs):
         x = self.conv1(x_in)
         x = self.conv2(x)
@@ -96,9 +136,14 @@ class SimpleConvolutionalAutoencoder(nn.Module):
 
     def forward(self, x_in, **kwargs):
         x_latent = self.encode(x_in)
+        y_out = self.perceptron(x_latent.view(-1, self.perceptron_input_size))
         x_out = self.decode(x_latent)
-        return {'x_out': x_out}
+        return {'x_out': x_out, 'y_out': y_out}
 
-    def calculate_loss(self, x_out, x_in, **kwargs):
-        return F.binary_cross_entropy(x_out, x_in.view_as(x_out),
+    def calculate_loss(self, x_out, x_in, y_in, y_out, **kwargs):
+        reconstruction_loss = F.binary_cross_entropy(x_out, x_in.view_as(x_out),
                 size_average=False)
+        perceptron_loss = nn.CrossEntropyLoss()(input=y_out,
+                target=y_in)
+        return ((self.autoencoder_ratio * reconstruction_loss) +
+               (1 - self.autoencoder_ratio) * perceptron_loss)

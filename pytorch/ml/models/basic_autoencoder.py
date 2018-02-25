@@ -39,7 +39,6 @@ class BasicAutoencoder(nn.Module):
         x_out = self.decode(x_latent)
         return {'x_out': x_out}
 
-
-def basic_autoencoder_loss_fn(x_out, x_in, **kwargs):
-    return F.binary_cross_entropy(x_out, x_in.view_as(x_out),
-            size_average=False)
+    def calculate_loss(self, x_out, x_in, **kwargs):
+        return F.binary_cross_entropy(x_out, x_in.view_as(x_out),
+                size_average=False)
