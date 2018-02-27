@@ -7,12 +7,27 @@ Finally, we will install python 3.6.3 via pyenv to keep our stuff isolated from 
 
 ## Kernel Version
 Some talk on forums suggested that cuda doesn't play nice with 4.13 linux
-kernel, so we'll manually booted back into 4.10 by updating `GRUB_DEFAULT` in
+kernel, so we'll manually installed 4.4.0 which is the only kernel supported by the nvidia cuda toolkit.
+```
+sudo apt-get update
+sudo apt-get install linux-image-4.4.0-116-generic linux-headers-4.4.0-116-generic
+```
+
+We then make grub boot into 4.4.0 by updating `GRUB_DEFAULT` in
 `/etc/default/grub` and running `sudo update-grub` followed by a reboot.
 
 ```
-GRUB_DEFAULT="Advanced options for Ubuntu>Ubuntu, with Linux 4.10.0-42-generic"
+GRUB_DEFAULT="Advanced options for Ubuntu>Ubuntu, with Linux 4.4.0-116-generic"
 ```
+
+## Install nvidia driver
+```
+sudo apt-get purge nvidia*
+sudo add-apt-repository ppa:graphics-drivers/ppa
+sudo apt-get update
+sudo apt-get install nvidia-390
+```
+Reboot after this and ensure driver is running by using `$ nvidia-smi`.
 
 ## Cuda Toolkit 9.0 preinstallation checks:
 
