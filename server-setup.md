@@ -1,36 +1,11 @@
 # Setup Guide
 This guide details the changes we need to make to a base Ubuntu 16.04 machine.
-We will install cuda toolkit 9.0 and cudnn 7.
-Cuda toolkit 9.0 is broken with the latest kernel, so we have to go back to 4.10.
+We will install cuda toolkit 9.1 and cudnn 7.0.5.
 
+Cuda toolkit 9.1 only works with the 4.10 kernel that is default on 16.04.3.
 Finally, we will install python 3.6.3 via pyenv to keep our stuff isolated from the system python.
 
-## Kernel Version
-Some talk on forums suggested that cuda doesn't play nice with 4.13 linux
-kernel, so we'll manually installed 4.4.0 which is the only kernel supported by the nvidia cuda toolkit.
-```
-sudo apt-get update
-sudo apt-get install linux-image-4.4.0-116-generic linux-headers-4.4.0-116-generic
-```
-
-We then make grub boot into 4.4.0 by updating `GRUB_DEFAULT` in
-`/etc/default/grub` and running `sudo update-grub` followed by a reboot.
-
-```
-GRUB_DEFAULT="Advanced options for Ubuntu>Ubuntu, with Linux 4.4.0-116-generic"
-```
-
-## Install nvidia driver
-```
-sudo apt-get purge nvidia*
-sudo add-apt-repository ppa:graphics-drivers/ppa
-sudo apt-get update
-sudo apt-get install nvidia-390
-```
-Reboot after this and ensure driver is running by using `$ nvidia-smi`.
-
 ## Cuda Toolkit 9.0 preinstallation checks:
-
 ```
 $ lspci | grep -i nvidia
 02:00.0 VGA compatible controller: NVIDIA Corporation GP106 [GeForce GTX 1060 6GB] (rev a1)
@@ -47,19 +22,14 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 ```
 $ uname -r
-4.10.0-42-generic
+4.10.0-28-generic
 ```
 
 Ensure linux-headers for running kernel are installed.
 ```
 $ dpkg -l | grep linux-headers
-ii  linux-headers-4.10.0-37                    4.10.0-37.41~16.04.1                         all          Header files related to Linux kernel version 4.10.0
-ii  linux-headers-4.10.0-37-generic            4.10.0-37.41~16.04.1                         amd64        Linux kernel headers for version 4.10.0 on 64 bit x86 SMP
-ii  linux-headers-4.10.0-42                    4.10.0-42.46~16.04.1                         all          Header files related to Linux kernel version 4.10.0
-ii  linux-headers-4.10.0-42-generic            4.10.0-42.46~16.04.1                         amd64        Linux kernel headers for version 4.10.0 on 64 bit x86 SMP
-ii  linux-headers-4.13.0-26                    4.13.0-26.29~16.04.2                         all          Header files related to Linux kernel version 4.13.0
-ii  linux-headers-4.13.0-26-generic            4.13.0-26.29~16.04.2                         amd64        Linux kernel headers for version 4.13.0 on 64 bit x86 SMP
-ii  linux-headers-generic-hwe-16.04            4.13.0.26.46                                 amd64        Generic Linux kernel headers
+ii  linux-headers-4.10.0-28                    4.10.0-28.32~16.04.2                       all          Header files related to Linux kernel version 4.10.0
+ii  linux-headers-4.10.0-28-generic            4.10.0-28.32~16.04.2                       amd64        Linux kernel headers for version 4.10.0 on 64 bit x86 SMP
 ```
 
 Get the debian packages from nvidia.  Some of them require a login to the nvidia developer network.
@@ -91,7 +61,7 @@ $ sudo apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cud
 Install
 ```
 $ sudo apt-get update
-$ sudo apt-get install cuda-toolkit-9-0
+$ sudo apt-get install cuda
 ```
 
 Failure, reboot and try again
@@ -101,22 +71,22 @@ Failed to initialize NVML: Driver/library version mismatch
 ```
 ```
 $ nvidia-smi
-Mon Jan 15 13:13:55 2018
+Tue Feb 27 20:43:53 2018
 +-----------------------------------------------------------------------------+
-| NVIDIA-SMI 387.26                 Driver Version: 387.26                    |
+| NVIDIA-SMI 390.30                 Driver Version: 390.30                    |
 |-------------------------------+----------------------+----------------------+
 | GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |
 | Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |
 |===============================+======================+======================|
 |   0  GeForce GTX 106...  Off  | 00000000:02:00.0  On |                  N/A |
-|  0%   20C    P8     8W / 156W |     61MiB /  6069MiB |      0%      Default |
+|  0%   20C    P8     5W / 156W |     71MiB /  6070MiB |      0%      Default |
 +-------------------------------+----------------------+----------------------+
 
 +-----------------------------------------------------------------------------+
 | Processes:                                                       GPU Memory |
 |  GPU       PID   Type   Process name                             Usage      |
 |=============================================================================|
-|    0      1117      G   /usr/lib/xorg/Xorg                            59MiB |
+|    0      1041      G   /usr/lib/xorg/Xorg                            69MiB |
 +-----------------------------------------------------------------------------+
 ```
 
@@ -124,8 +94,8 @@ Mon Jan 15 13:13:55 2018
 
 Add this to `~/.bashrc`:
 ```
-export PATH=/usr/local/cuda-9.0/bin${PATH:+:${PATH}}
-export LD_LIBRARY_PATH=/usr/local/cuda-9.0/lib\
+export PATH=/usr/local/cuda-9.1/bin${PATH:+:${PATH}}
+export LD_LIBRARY_PATH=/usr/local/cuda-9.1/lib\
                          ${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
 ```
 
@@ -239,7 +209,7 @@ Result = PASS
 ### Get the debian packages
 You'll need an account on the nvidia developer network.  Then you can find them [here](https://developer.nvidia.com/rdp/cudnn-download).
 ```
-$ ls -lah *cudnn* | grep 9.0
+$ ls -lah *cudnn* | grep 9.1
 -rw-r--r-- 1 ubuntu ubuntu  98M Jan 15 10:43 libcudnn7_7.0.3.11-1+cuda9.0_amd64.deb
 -rw-r--r-- 1 ubuntu ubuntu  89M Jan 15 10:43 libcudnn7-dev_7.0.3.11-1+cuda9.0_amd64.deb
 -rw-r--r-- 1 ubuntu ubuntu 4.3M Jan 15 16:02 libcudnn7-doc_7.0.5.15-1+cuda9.0_amd64.deb
@@ -247,7 +217,7 @@ $ ls -lah *cudnn* | grep 9.0
 
 Install using dpkg
 ```
-$ ls *cudnn* | grep 9.0 | xargs -n 1 sudo dpkg -i
+$ ls *cudnn* | grep 9.1 | xargs -n 1 sudo dpkg -i
 ```
 
 ## Verify cuDNN Install
@@ -332,6 +302,7 @@ Now we download pyenv and update our login scripts so they setup the shims corre
 ```
 git clone https://github.com/pyenv/pyenv.git ~/.pyenv
 echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc
+echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc
 echo -e 'if command -v pyenv 1>/dev/null 2>&1; then\n  eval "$(pyenv init -)"\nfi' >> ~/.bashrc
 ```
 
