@@ -138,7 +138,7 @@ class ConvolutionalAutoencoderPlusPerceptron(nn.Module):
                 hidden_features=hidden_features,
                 output_features=perceptron_features)
 
-        self.autoencoder_ratio = 1.0
+        self.autoencoder_ratio = 0.95
 
     def encode(self, x_in, **kwargs):
         x = self.conv0(x_in)
