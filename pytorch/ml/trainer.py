@@ -132,7 +132,7 @@ class Trainer:
         self.optimizer.zero_grad()
 
         data, labels = self.training_data_generator.next()
-        step_dict = self._do_step(data, labels)
+        step_dict = self._do_step(data, labels, train=True)
         loss = step_dict['total_loss']
 
         loss.backward()
@@ -140,12 +140,13 @@ class Trainer:
 
         return loss.data[0] / len(data)
 
-    def _do_step(self, data, labels):
-        run_dict = self._run_model(data, labels)
+    def _do_step(self, data, labels, train):
+        run_dict = self._run_model(data, labels, train=train)
         losses = self.model.calculate_losses(**run_dict)
         return {**losses, **run_dict}
 
-    def _run_model(self, data, labels):
+    def _run_model(self, data, labels, train):
+        self.model.train(train)
         x_in = Variable(data).cuda()
         y_in = Variable(labels).cuda()
         in_dict = {'x_in': x_in, 'y_in': y_in}
@@ -155,7 +156,8 @@ class Trainer:
 
     def _do_test_step(self):
         data, labels = self.test_data_generator.next()
-        step_dict = self._do_step(data, labels)
+        step_dict = self._do_step(data, labels, train=False)
+        self.model.train(True)
         return step_dict['total_loss'].data[0] / len(data)
 
     @property
@@ -168,14 +170,14 @@ class Trainer:
     def test(self):
         loss = 0.0
         for data, labels in self.test_data_loader:
-            step_dict = self._do_step(data, labels)
+            step_dict = self._do_step(data, labels, train=False)
             loss += step_dict['total_loss'].data[0]
         return loss / len(self.test_data_loader.dataset)
 
     def plot_input_output_pairs(self, title='A Sampling of Autoencoder Results',
         num_cols=10, figsize=(15, 3.2)):
         data, labels = self.test_data_generator.next()
-        out_dict = self._run_model(data, labels)
+        out_dict = self._run_model(data, labels, train=True)
         x_out = out_dict['x_out']
 
         fig = plt.figure(figsize=figsize)
@@ -204,6 +206,7 @@ class Trainer:
         fig = plt.figure(figsize=figsize)
         fig.suptitle(title, fontsize=20)
 
+        self.model.train(False)
         for data, labels in self.test_data_loader:
             x_in = Variable(data).cuda()
             y_in = Variable(labels).cuda()
