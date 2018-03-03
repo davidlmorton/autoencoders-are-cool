@@ -4,8 +4,10 @@ from ml.utils import Progbar
 from torch.autograd import Variable
 
 import math
-import pandas as pd
 import numpy as np
+import pandas as pd
+import tempfile
+import torch
 
 
 class Trainer:
@@ -27,10 +29,33 @@ class Trainer:
 
         self.reset_history()
 
+        self.checkpoint_filename = None
+
     def reset_history(self):
         self.last_avg_training_loss = 0.0
         self.last_avg_test_loss = 0.0
         self.history_df = None
+
+    def checkpoint(self, filename=None):
+        filename = self.save_model_state(filename=filename)
+        self.checkpoint_filename = filename
+        return filename
+
+    def save_model_state(self, filename):
+        if filename is None:
+            with tempfile.NamedTemporaryFile() as ofile:
+                filename = ofile.name
+        torch.save(self.model.state_dict(), filename)
+        return filename
+
+    def restore(self):
+        if self.checkpoint_filename is None:
+            raise RuntimeError("You haven't checkpointed this trainer's "
+                    "model yet!")
+        self.load_model_state(self.checkpoint_filename)
+
+    def load_model_state(self, filename):
+        self.model.load_state_dict(torch.load(filename))
 
     def plot_history(self, title="Training History", figsize=(15, 5),
                     skip_first=200, fig=None):
