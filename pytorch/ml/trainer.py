@@ -1,7 +1,8 @@
 from matplotlib import pyplot as plt
 from ml.data_generator import DataGenerator
-from ml.utils import Progbar
 from torch.autograd import Variable
+from ml.journal import DataframeJournal
+from ml.progress_monitor import StdoutProgressMonitor
 
 import math
 import numpy as np
@@ -12,7 +13,7 @@ import torch
 
 class Trainer:
     def __init__(self, *, model, training_data_loader, test_data_loader,
-                 optimizer, loss_alpha=0.1):
+                 optimizer, journal=None, progress_monitor=None):
         self.model = model
 
         self.training_data_loader = training_data_loader
@@ -21,20 +22,20 @@ class Trainer:
         self.test_data_loader = test_data_loader
         self.test_data_generator = DataGenerator(test_data_loader)
 
+        if journal is None:
+            journal = DataframeJournal()
+        self.journal = journal
+
+        if progress_monitor is None:
+            progress_monitor = StdoutProgressMonitor()
+        self.progress_monitor = progress_monitor
+
         self.train_to_test_ratio = (len(training_data_loader) //
                                     len(test_data_loader))
 
         self.optimizer = optimizer
-        self.loss_alpha = loss_alpha
-
-        self.reset_history()
 
         self.checkpoint_filename = None
-
-    def reset_history(self):
-        self.last_avg_training_loss = 0.0
-        self.last_avg_test_loss = 0.0
-        self.history_df = None
 
     def checkpoint(self, filename=None):
         filename = self.save_model_state(filename=filename)
@@ -58,22 +59,26 @@ class Trainer:
         self.model.load_state_dict(torch.load(filename))
 
     def plot_history(self, title="Training History", figsize=(15, 5),
-                    skip_first=200, fig=None):
+                    skip_first=100, smooth_window=50, fig=None):
         if fig is None:
             fig = plt.figure(figsize=figsize)
 
-        history_df = self.history_df.loc[skip_first:]
+        df = self.journal.df.loc[skip_first:]
 
         ax = plt.subplot2grid((4, 1), (0, 0), rowspan=3, fig=fig)
-        history_df.training_losses.plot(ax=ax, color='mediumseagreen',
+        training_loss = df.training_total_loss.rolling(smooth_window,
+                min_periods=1, center=True).mean()
+        training_loss.plot(ax=ax, color='mediumseagreen',
                                              label='Training Loss')
-        history_df.test_losses.plot(ax=ax, color='tomato',
-                                    label='Test Loss')
+
+        test_loss = df.test_total_loss.rolling(smooth_window,
+                min_periods=1, center=True).mean()
+        test_loss.plot(ax=ax, color='tomato', label='Test Loss')
         ax.set_title(title)
         ax.legend()
 
         ax = plt.subplot2grid((4, 1), (3, 0), fig=fig)
-        history_df.learning_rates.plot(ax=ax, color='dodgerblue',
+        df.learning_rate.plot(ax=ax, color='dodgerblue',
                                        label='Learning Rate')
         ax.legend()
 
@@ -91,58 +96,35 @@ class Trainer:
         if min_learning_rate is None:
             min_learning_rate = max_learning_rate / 50.0
 
-        avg_training_loss = self.last_avg_training_loss
-        avg_test_loss = self.last_avg_test_loss
-        iterations_since_test = 0
-        learning_rates = []
-        training_losses = []
-        test_losses = []
+        iterations_since_test = self.train_to_test_ratio
 
-        num_iterations = math.ceil(num_epochs * len(self.training_data_loader))
+        num_steps = math.ceil(num_epochs * len(self.training_data_loader))
 
         verbose = 0 if disable_progress_bar else 1
-        progress_bar = Progbar(num_iterations,
-                stateful_metrics=['loss', 'val_loss'], verbose=verbose)
-        for i in range(num_iterations):
+        self.progress_monitor.start_session(num_steps,
+                metric_names={'training_total_loss': 'loss',
+                              'test_total_loss': 'val_loss'},
+                verbose=verbose)
+
+        for i in range(num_steps):
             new_learning_rate = self._update_learning_rate(
                 min_learning_rate=min_learning_rate,
                 max_learning_rate=max_learning_rate,
-                progression=i/num_iterations)
+                progression=i/num_steps)
 
-            training_loss = self._do_training_step()
-
-            avg_training_loss = ((self.loss_alpha * training_loss) +
-                    (1.0 - self.loss_alpha) * avg_training_loss)
-            self.last_avg_training_loss = avg_training_loss
+            training_step_dict = self._do_training_step()
 
             iterations_since_test += 1
             if iterations_since_test >= self.train_to_test_ratio:
-                test_loss = self._do_test_step()
-                avg_test_loss = ((self.loss_alpha * test_loss) +
-                        (1.0 - self.loss_alpha) * avg_test_loss)
-                self.last_avg_test_loss = avg_test_loss
-
+                test_step_dict = self._do_test_step()
                 iterations_since_test = 0
 
-            learning_rates.append(new_learning_rate)
-            training_losses.append(avg_training_loss)
-            test_losses.append(avg_test_loss)
+            step_data = {'learning_rate': new_learning_rate,
+                    **training_step_dict,
+                    **test_step_dict}
 
-            progress_bar.add(1,
-                [('loss', avg_training_loss),
-                 ('val_loss', avg_test_loss)])
-
-        result = {'learning_rates': learning_rates,
-                'training_losses': training_losses,
-                'test_losses': test_losses}
-        history_df = pd.DataFrame.from_dict(result)
-        if self.history_df is None:
-            self.history_df = history_df
-        else:
-            self.history_df = pd.concat([self.history_df, history_df],
-                                       ignore_index=True)
-
-        return result
+            self.journal.record_step(step_data)
+            self.progress_monitor.step(step_data)
 
     def _update_learning_rate(self, *, min_learning_rate,
             max_learning_rate, progression):
@@ -163,12 +145,12 @@ class Trainer:
         loss.backward()
         self.optimizer.step()
 
-        return loss.data[0] / len(data)
+        return {f'training_{k}': v for k, v in step_dict.items()}
 
     def _do_step(self, data, labels, train):
         run_dict = self._run_model(data, labels, train=train)
-        losses = self.model.calculate_losses(**run_dict)
-        return {**losses, **run_dict}
+        loss_dict = self.model.calculate_losses(**run_dict)
+        return {**loss_dict, **run_dict}
 
     def _run_model(self, data, labels, train):
         self.model.train(train)
@@ -182,8 +164,7 @@ class Trainer:
     def _do_test_step(self):
         data, labels = self.test_data_generator.next()
         step_dict = self._do_step(data, labels, train=False)
-        self.model.train(True)
-        return step_dict['total_loss'].data[0] / len(data)
+        return {f'test_{k}': v for k, v in step_dict.items()}
 
     @property
     def num_trainable_parameters(self):
