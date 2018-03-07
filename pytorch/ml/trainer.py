@@ -42,7 +42,7 @@ class Trainer:
         self.checkpoint_filename = filename
         return filename
 
-    def save_model_state(self, filename):
+    def save_model_state(self, filename=None):
         if filename is None:
             with tempfile.NamedTemporaryFile() as ofile:
                 filename = ofile.name
