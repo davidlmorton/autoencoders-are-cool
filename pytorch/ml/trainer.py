@@ -58,33 +58,6 @@ class Trainer:
     def load_model_state(self, filename):
         self.model.load_state_dict(torch.load(filename))
 
-    def plot_history(self, title="Training History", figsize=(15, 5),
-                    skip_first=100, smooth_window=50, fig=None):
-        if fig is None:
-            fig = plt.figure(figsize=figsize)
-
-        df = self.journal.df.loc[skip_first:]
-
-        ax = plt.subplot2grid((4, 1), (0, 0), rowspan=3, fig=fig)
-        training_loss = df.training_total_loss.rolling(smooth_window,
-                min_periods=1, center=True).mean()
-        training_loss.plot(ax=ax, color='mediumseagreen',
-                                             label='Training Loss')
-
-        test_loss = df.test_total_loss.rolling(smooth_window,
-                min_periods=1, center=True).mean()
-        test_loss.plot(ax=ax, color='tomato', label='Test Loss')
-        ax.set_title(title)
-        ax.legend()
-
-        ax = plt.subplot2grid((4, 1), (3, 0), fig=fig)
-        df.learning_rate.plot(ax=ax, color='dodgerblue',
-                                       label='Learning Rate')
-        ax.legend()
-
-        plt.tight_layout()
-        return fig
-
     def multi_train(self, *, learning_rate, cycles=7,
             disable_progress_bar=False):
         for i in range(cycles):
