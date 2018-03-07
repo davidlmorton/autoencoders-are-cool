@@ -99,6 +99,7 @@ class SimpleConvolutionalAutoencoder(nn.Module):
         x_out = self.decode(x_latent)
         return {'x_out': x_out}
 
-    def calculate_loss(self, x_out, x_in, **kwargs):
-        return F.binary_cross_entropy(x_out, x_in.view_as(x_out),
-                size_average=False)
+    def calculate_losses(self, x_out, x_in, **kwargs):
+        reconstruction_loss = F.binary_cross_entropy(x_out, x_in.view_as(x_out),
+                size_average=False) / (x_in.shape[-1] * x_in.shape[-2])
+        return {'total_loss': reconstruction_loss / x_in.shape[0]}

@@ -168,6 +168,6 @@ class ConvolutionalAutoencoderPlusPerceptron(nn.Module):
         total_loss = ((self.autoencoder_ratio * reconstruction_loss) +
                (1 - self.autoencoder_ratio) * perceptron_loss)
 
-        return {'reconstruction_loss': reconstruction_loss,
-                'perceptron_loss': perceptron_loss,
-                'total_loss': total_loss}
+        return {'reconstruction_loss': reconstruction_loss / x_in.shape[0],
+                'perceptron_loss': perceptron_loss / x_in.shape[0],
+                'total_loss': total_loss / x_in.shape[0]}

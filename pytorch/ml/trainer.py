@@ -194,7 +194,7 @@ class Trainer:
         for data, labels in self.test_data_loader:
             step_dict = self._do_step(data, labels, train=False)
             loss += step_dict['total_loss'].data[0]
-        return loss / len(self.test_data_loader.dataset)
+        return loss / len(self.test_data_loader)
 
     def plot_input_output_pairs(self, title='A Sampling of Autoencoder Results',
         num_cols=10, figsize=(15, 3.2)):
