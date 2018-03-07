@@ -3,6 +3,7 @@ from ml.data_generator import DataGenerator
 from torch.autograd import Variable
 from ml.journal import DataframeJournal
 from ml.progress_monitor import StdoutProgressMonitor
+from ml.rate_controller import CosineRateController, ExponentialRateController
 
 import math
 import numpy as np
@@ -13,7 +14,8 @@ import torch
 
 class Trainer:
     def __init__(self, *, model, training_data_loader, test_data_loader,
-                 optimizer, journal=None, progress_monitor=None):
+                 optimizer, journal=None, progress_monitor=None,
+                 rate_controller=None):
         self.model = model
 
         self.training_data_loader = training_data_loader
@@ -29,6 +31,10 @@ class Trainer:
         if progress_monitor is None:
             progress_monitor = StdoutProgressMonitor()
         self.progress_monitor = progress_monitor
+
+        if rate_controller is None:
+            rate_controller = CosineRateController()
+        self.rate_controller = rate_controller
 
         self.train_to_test_ratio = (len(training_data_loader) //
                                     len(test_data_loader))
@@ -58,32 +64,45 @@ class Trainer:
     def load_model_state(self, filename):
         self.model.load_state_dict(torch.load(filename))
 
-    def multi_train(self, *, learning_rate, cycles=7,
+    def multi_train(self, *, max_learning_rate,
+            min_learning_rate=None, cycles=7,
             disable_progress_bar=False):
         for i in range(cycles):
-            self.train(num_epochs=i+1, max_learning_rate=learning_rate,
-                      disable_progress_bar=disable_progress_bar)
+            self.train(num_epochs=i+1,
+                    max_learning_rate=max_learning_rate,
+                    min_learning_rate=min_learning_rate,
+                    disable_progress_bar=disable_progress_bar)
 
     def train(self, *, num_epochs, max_learning_rate=0.002,
             min_learning_rate=None, disable_progress_bar=False):
-        if min_learning_rate is None:
-            min_learning_rate = max_learning_rate / 50.0
+        rate_controller = CosineRateController()
+        num_steps = math.ceil(num_epochs * len(self.training_data_loader))
+        rate_controller.start_session(
+                min_learning_rate=min_learning_rate,
+                max_learning_rate=max_learning_rate,
+                num_steps=num_steps)
+        return self._train(num_steps=num_steps,
+                rate_controller=rate_controller,
+                disable_progress_bar=disable_progress_bar,
+                journal=self.journal,
+                progress_monitor=self.progress_monitor)
 
+    def _train(self, *, num_steps, rate_controller,
+            disable_progress_bar=False,
+            journal, progress_monitor):
         iterations_since_test = self.train_to_test_ratio
 
-        num_steps = math.ceil(num_epochs * len(self.training_data_loader))
-
         verbose = 0 if disable_progress_bar else 1
-        self.progress_monitor.start_session(num_steps,
+        progress_monitor.start_session(num_steps,
                 metric_names={'training_total_loss': 'loss',
                               'test_total_loss': 'val_loss'},
                 verbose=verbose)
 
+        step_data = {}
         for i in range(num_steps):
-            new_learning_rate = self._update_learning_rate(
-                min_learning_rate=min_learning_rate,
-                max_learning_rate=max_learning_rate,
-                progression=i/num_steps)
+            new_learning_rate = rate_controller.new_learning_rate(
+                    step=i, data=step_data)
+            self._update_learning_rate(new_learning_rate)
 
             training_step_dict = self._do_training_step()
 
@@ -96,14 +115,10 @@ class Trainer:
                     **training_step_dict,
                     **test_step_dict}
 
-            self.journal.record_step(step_data)
-            self.progress_monitor.step(step_data)
+            journal.record_step(step_data)
+            progress_monitor.step(step_data)
 
-    def _update_learning_rate(self, *, min_learning_rate,
-            max_learning_rate, progression):
-        new_learning_rate = (min_learning_rate +
-                (max_learning_rate - min_learning_rate) *
-                (1 + math.cos(math.pi * progression)) / 2)
+    def _update_learning_rate(self, new_learning_rate):
         for param_group in self.optimizer.param_groups:
             param_group['lr'] = new_learning_rate
         return new_learning_rate
