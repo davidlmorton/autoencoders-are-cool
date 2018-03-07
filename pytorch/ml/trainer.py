@@ -118,6 +118,34 @@ class Trainer:
             journal.record_step(step_data)
             progress_monitor.step(step_data)
 
+    def survey_learning_rate(self, *, num_epochs=1.0,
+            min_learning_rate=1e-12,
+            max_learning_rate=10,
+            journal=None,
+            progress_monitor=None):
+        if journal is None:
+            journal = DataframeJournal()
+
+        if progress_monitor is None:
+            progress_monitor = StdoutProgressMonitor()
+
+        filename = self.save_model_state()
+
+        num_steps = math.ceil(num_epochs * len(self.training_data_loader))
+        rate_controller = ExponentialRateController()
+        rate_controller.start_session(
+                min_learning_rate=min_learning_rate,
+                max_learning_rate=max_learning_rate,
+                num_steps=num_steps)
+        self._train(num_steps=num_steps,
+                rate_controller=rate_controller,
+                journal=journal,
+                progress_monitor=progress_monitor)
+
+        self.load_model_state(filename)
+
+        return journal
+
     def _update_learning_rate(self, new_learning_rate):
         for param_group in self.optimizer.param_groups:
             param_group['lr'] = new_learning_rate
